@@ -46,8 +46,8 @@
 
         <!-- ** BAHAGIAN MUAT NAIK FAIL CSV TELAH DIBUANG ** -->
 
-        <!-- Pilihan Peserta -->
-        <div class="mb-6">
+        <!-- Pilihan Peserta (Disembunyikan untuk privasi) -->
+        <div class="mb-6" style="display: none;">
             <label for="peserta-select" class="block text-sm font-medium text-gray-700 mb-2">
                 Pilih Peserta:
             </label>
@@ -98,9 +98,8 @@
     <script>
         // --- KONFIGURASI ---
         
-        // ** BARU: Tentukan nama fail CSV yang akan dimuatkan **
-        // Pastikan fail ini berada di direktori yang sama dengan fail index.html anda di GitHub
-        const DATA_CSV_URL = 'data_propkes_pra.csv';
+        // ** DATA_CSV_URL tidak lagi digunakan, ia akan ditentukan secara dinamik **
+        // const DATA_CSV_URL = 'data_propkes_pra.csv'; 
 
         // Indeks kolum berdasarkan fail CSV
         const NAMA_INDEX = 3; // Kolum 'NAMA PESERTA'
@@ -283,7 +282,8 @@
                 pesertaData = [];
                 const rows = csvText.split(/\r?\n/).filter(row => row.trim() !== '');
                 
-                pesertaData = rows.slice(1).map(rowStr => {
+                // Anggap baris pertama ialah header, dan hanya ada SATU baris data
+                pesertaData = rows.slice(1).map(rowStr => { 
                     const row = parseCSVRow(rowStr);
                     
                     if (!row[NAMA_INDEX] || row[NAMA_INDEX].trim() === '') {
@@ -332,22 +332,24 @@
                     };
                 }).filter(p => p !== null); 
 
-                populateDropdown();
-                populateKey(); 
-                selectEl.disabled = false; 
-                
-                selectEl.addEventListener('change', (e) => {
-                    updateDisplays(e.target.value); 
-                });
+                // --- LOGIK BARU UNTUK FAIL CSV TUNGGAL ---
 
-                if (pesertaData.length > 0) {
-                    updateDisplays(pesertaData[0].nama); 
-                    statusEl.textContent = `Berjaya memaparkan ${pesertaData.length} respons.`;
-                    statusEl.className = "text-center text-green-600 mb-4";
-                } else {
-                    throw new Error("Tiada data peserta ditemui dalam fail. Semak format CSV atau pemetaan indeks.");
+                if (pesertaData.length === 0) {
+                    throw new Error("Fail CSV ini tidak mempunyai data yang sah atau kosong.");
                 }
 
+                // Memandangkan fail ini hanya untuk seorang, kita ambil peserta pertama
+                const peserta = pesertaData[0]; 
+
+                populateKey(); // Sediakan petunjuk untuk carta bar
+                updateDisplays(peserta.nama); // Paparkan data peserta ini
+                
+                // Kemas kini status untuk menunjukkan nama peserta yang dipaparkan
+                statusEl.textContent = `Laporan Kompetensi i-PROPKES`;
+                statusEl.className = "text-center text-gray-700 mb-4";
+                
+                // Tiada lagi carian atau logik dropdown diperlukan
+                
             } catch (error) {
                 console.error("Ralat memproses data:", error);
                 statusEl.textContent = `Ralat: ${error.message}`;
@@ -358,7 +360,7 @@
         }
 
         /**
-         * Mengisi senarai dropdown dengan nama peserta
+         * Mengisi senarai dropdown dengan nama peserta (TIDAK DIGUNAKAN, TAPI DIBIARKAN)
          */
         function populateDropdown() {
             selectEl.innerHTML = ''; 
@@ -387,6 +389,7 @@
          * Fungsi utama untuk mengemas kini semua paparan
          */
         function updateDisplays(namaPeserta) {
+            // Kita cari dari 'pesertaData' global, yang sepatutnya hanya ada satu item
             const peserta = pesertaData.find(p => p.nama === namaPeserta);
             if (!peserta) return;
 
@@ -585,9 +588,27 @@
 
         // --- MULAKAN APLIKASI ---
         
-        // ** BARU: Panggil fungsi 'loadDataFromURL' apabila halaman dimuatkan **
-        // Gantikan 'uploadEl.addEventListener' yang lama
-        loadDataFromURL(DATA_CSV_URL);
+        // ** LOGIK BARU: Dapatkan nama fail dari URL **
+        
+        // Dapatkan parameter 'data' dari URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataFileKey = urlParams.get('data'); // cth: 'ali' dari '?data=ali'
+
+        if (dataFileKey) {
+            // ** DIKEMAS KINI: Tukar kunci kepada huruf kecil & buang ruang **
+            const cleanKey = dataFileKey.trim().toLowerCase();
+
+            // Jika ada kunci fail, bina URL CSV dan muatkannya
+            // cth: 'ali' -> 'ali.csv'
+            const dynamicCsvUrl = cleanKey + '.csv'; 
+            loadDataFromURL(dynamicCsvUrl);
+        } else {
+            // Tiada kunci fail di URL, paparkan ralat
+            statusEl.textContent = "Pautan tidak lengkap.";
+            statusEl.className = "text-center text-yellow-700 font-bold mb-4";
+            ringkasanEl.innerHTML = `<p class="font-semibold text-yellow-700">Sila gunakan pautan unik yang telah diberikan kepada anda untuk melihat laporan kompetensi anda.</p>`;
+            selectEl.innerHTML = '<option>Pautan tidak sah</option>';
+        }
 
 
         // Event listener untuk butang toggle
