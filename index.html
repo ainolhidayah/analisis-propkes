@@ -41,7 +41,7 @@
 
         <!-- Mesej Status untuk memuatkan data -->
         <div id="status" class="text-center text-gray-500 mb-4">
-            Memuatkan data...
+            Memproses data...
         </div>
 
         <!-- ** BAHAGIAN MUAT NAIK FAIL CSV TELAH DIBUANG ** -->
@@ -52,7 +52,7 @@
                 Pilih Peserta:
             </label>
             <select id="peserta-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
-                <option>Memuatkan data...</option>
+                <option>Memproses data...</option>
                 <!-- Pilihan akan diisi oleh JavaScript -->
             </select>
         </div>
@@ -184,24 +184,24 @@
          * ** FUNGSI BARU: Memuatkan data dari URL menggunakan fetch() **
          */
         async function loadDataFromURL(url) {
-            statusEl.textContent = `Memuatkan data dari ${url}...`;
+            statusEl.textContent = `Memproses data dari ${url}...`;
             statusEl.className = "text-center text-gray-500 mb-4";
             selectEl.disabled = true;
-            selectEl.innerHTML = '<option>Memuatkan data...</option>';
+            selectEl.innerHTML = '<option>Memproses data...</option>';
 
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
-                    throw new Error(`Gagal memuatkan fail: ${response.status} ${response.statusText}`);
+                    throw new Error(`Gagal mendapatkan fail: ${response.status} ${response.statusText}`);
                 }
                 const csvText = await response.text();
                 // Gunakan semula fungsi processData sedia ada
                 processData(csvText); 
             } catch (error) {
                 console.error("Ralat memuatkan data CSV:", error);
-                statusEl.textContent = `Ralat: Gagal memuatkan data. Pastikan fail ${url} wujud di lokasi yang betul.`;
+                statusEl.textContent = `Ralat: Gagal mendapatkan data. Pastikan fail ${url} wujud di lokasi yang betul.`;
                 statusEl.className = "text-center text-red-600 font-bold mb-4";
-                selectEl.innerHTML = '<option>Gagal memuatkan data</option>';
+                selectEl.innerHTML = '<option>Gagal mendapatkan data</option>';
             }
         }
 
@@ -342,7 +342,7 @@
 
                 if (pesertaData.length > 0) {
                     updateDisplays(pesertaData[0].nama); 
-                    statusEl.textContent = `Berjaya memuatkan ${pesertaData.length} respons.`;
+                    statusEl.textContent = `Berjaya memaparkan ${pesertaData.length} respons.`;
                     statusEl.className = "text-center text-green-600 mb-4";
                 } else {
                     throw new Error("Tiada data peserta ditemui dalam fail. Semak format CSV atau pemetaan indeks.");
@@ -352,7 +352,7 @@
                 console.error("Ralat memproses data:", error);
                 statusEl.textContent = `Ralat: ${error.message}`;
                 statusEl.className = "text-center text-red-600 font-bold mb-4";
-                selectEl.innerHTML = '<option>Gagal memuatkan data</option>';
+                selectEl.innerHTML = '<option>Gagal mendapatkan data</option>';
                 selectEl.disabled = true;
             }
         }
