@@ -41,36 +41,25 @@
 
         <!-- Mesej Status untuk memuatkan data -->
         <div id="status" class="text-center text-gray-500 mb-4">
-            Sila muat naik fail CSV anda untuk bermula.
+            Memuatkan data...
         </div>
 
-        <!-- Pilihan Fail CSV -->
-        <div class="mb-6">
-            <label for="csv-upload" class="block text-sm font-medium text-gray-700 mb-2">
-                1. Muat Naik Fail CSV Anda (cth: data_propkes_pra.csv):
-            </label>
-            <input type="file" id="csv-upload" accept=".csv" class="w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-lg file:border-0 file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100
-            "/>
-        </div>
+        <!-- ** BAHAGIAN MUAT NAIK FAIL CSV TELAH DIBUANG ** -->
 
         <!-- Pilihan Peserta -->
         <div class="mb-6">
             <label for="peserta-select" class="block text-sm font-medium text-gray-700 mb-2">
-                2. Pilih Peserta:
+                Pilih Peserta:
             </label>
             <select id="peserta-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
-                <option>Sila muat naik fail CSV dahulu</option>
+                <option>Memuatkan data...</option>
                 <!-- Pilihan akan diisi oleh JavaScript -->
             </select>
         </div>
 
         <!-- Butang Toggle Paparan -->
         <div class="mb-4 text-center">
-            <label class="block text-sm font-medium text-gray-700 mb-2">3. Pilih Paparan:</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Paparan:</label>
             <div class="inline-flex rounded-lg shadow-sm">
                 <button id="view-domain-btn" type="button" class="relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 focus:z-10 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
                     Paparan Domain (Radar)
@@ -91,7 +80,7 @@
             <canvas id="bar-chart"></canvas>
         </div>
 
-        <!-- ** BARU: Petunjuk Item (tersembunyi secara lalai) ** -->
+        <!-- Petunjuk Item (tersembunyi secara lalai) -->
         <div id="item-key-container" class="p-4 bg-gray-50 rounded-lg border" style="display: none;">
             <h3 class="text-lg font-semibold text-center mb-3">Petunjuk Item</h3>
             <div id="item-key-content" class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -108,6 +97,11 @@
 
     <script>
         // --- KONFIGURASI ---
+        
+        // ** BARU: Tentukan nama fail CSV yang akan dimuatkan **
+        // Pastikan fail ini berada di direktori yang sama dengan fail index.html anda di GitHub
+        const DATA_CSV_URL = 'data_propkes_pra.csv';
+
         // Indeks kolum berdasarkan fail CSV
         const NAMA_INDEX = 3; // Kolum 'NAMA PESERTA'
         
@@ -116,15 +110,14 @@
             'Pengetahuan': { start: 7, end: 15 },    // Soalan 1-9
             'Dasar & Matlamat': { start: 20, end: 23 }, // Soalan 14-17
             'Instruksional': { start: 24, end: 27 },  // Soalan 18-21
-            'Inovasi': { start: 28, end: 31 },       // Soalan 22-25
+            'Inovasi': { start: 28, end: 31 },      // Soalan 22-25
             'Hubungan': { start: 32, end: 36 },     // Soalan 26-30
-            'Sumber': { start: 37, end: 40 },       // Soalan 31-34
-            'Kendiri': { start: 41, end: 44 }        // Soalan 35-38
+            'Sumber': { start: 37, end: 40 },      // Soalan 31-34
+            'Kendiri': { start: 41, end: 44 }      // Soalan 35-38
         };
         const DOMAIN_LABELS = Object.keys(DOMAIN_MAP);
 
-        // ** DIKEMAS KINI: Pemetaan Item Individu dengan Tajuk **
-        // (P=Pengetahuan, D=Dasar, I=Instruksional, N=Inovasi, H=Hubungan, S=Sumber, K=Kendiri)
+        // Pemetaan Item Individu dengan Tajuk
         const ITEM_DEFINITIONS = [
             { label: 'P1', index: 7,  title: 'Pengetahuan: Kepimpinan Organisasi' }, 
             { label: 'P2', index: 8,  title: 'Pengetahuan: Pengurusan Kurikulum' }, 
@@ -175,17 +168,42 @@
         const statusEl = document.getElementById('status');
         const selectEl = document.getElementById('peserta-select');
         const ringkasanEl = document.getElementById('ringkasan');
-        const uploadEl = document.getElementById('csv-upload');
+        // 'uploadEl' tidak diperlukan lagi
 
         // Rujukan untuk elemen-elemen baru
         const viewDomainBtn = document.getElementById('view-domain-btn');
         const viewItemBtn = document.getElementById('view-item-btn');
         const radarContainer = document.getElementById('chart-container');
         const barContainer = document.getElementById('bar-chart-container');
-        const itemKeyContainer = document.getElementById('item-key-container'); // ** BARU **
-        const itemKeyContent = document.getElementById('item-key-content'); // ** BARU **
+        const itemKeyContainer = document.getElementById('item-key-container'); 
+        const itemKeyContent = document.getElementById('item-key-content'); 
 
         // --- FUNGSI ---
+
+        /**
+         * ** FUNGSI BARU: Memuatkan data dari URL menggunakan fetch() **
+         */
+        async function loadDataFromURL(url) {
+            statusEl.textContent = `Memuatkan data dari ${url}...`;
+            statusEl.className = "text-center text-gray-500 mb-4";
+            selectEl.disabled = true;
+            selectEl.innerHTML = '<option>Memuatkan data...</option>';
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Gagal memuatkan fail: ${response.status} ${response.statusText}`);
+                }
+                const csvText = await response.text();
+                // Gunakan semula fungsi processData sedia ada
+                processData(csvText); 
+            } catch (error) {
+                console.error("Ralat memuatkan data CSV:", error);
+                statusEl.textContent = `Ralat: Gagal memuatkan data. Pastikan fail ${url} wujud di lokasi yang betul.`;
+                statusEl.className = "text-center text-red-600 font-bold mb-4";
+                selectEl.innerHTML = '<option>Gagal memuatkan data</option>';
+            }
+        }
 
         /**
          * Fungsi untuk mem-parse satu baris CSV dengan betul
@@ -252,32 +270,10 @@
         }
 
         /**
-         * Mengendalikan fail yang dimuat naik
+         * ** FUNGSI 'handleFileUpload' TIDAK DIPERLUKAN LAGI **
          */
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) {
-                statusEl.textContent = "Tiada fail dipilih.";
-                statusEl.className = "text-center text-red-600 font-bold mb-4";
-                return;
-            }
+        // function handleFileUpload(event) { ... }
 
-            statusEl.textContent = `Memproses fail ${file.name}...`;
-            statusEl.className = "text-center text-gray-500 mb-4";
-            selectEl.disabled = true;
-            selectEl.innerHTML = '<option>Memproses data...</option>';
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const csvText = e.target.result;
-                processData(csvText); 
-            };
-            reader.onerror = function() {
-                statusEl.textContent = "Gagal membaca fail.";
-                statusEl.className = "text-center text-red-600 font-bold mb-4";
-            };
-            reader.readAsText(file);
-        }
 
         /**
          * Memproses data CSV dari teks
@@ -337,7 +333,7 @@
                 }).filter(p => p !== null); 
 
                 populateDropdown();
-                populateKey(); // ** BARU: Panggil fungsi untuk mengisi petunjuk **
+                populateKey(); 
                 selectEl.disabled = false; 
                 
                 selectEl.addEventListener('change', (e) => {
@@ -375,7 +371,7 @@
         }
 
         /**
-         * ** BARU: Fungsi untuk mengisi Petunjuk Item **
+         * Fungsi untuk mengisi Petunjuk Item
          */
         function populateKey() {
             itemKeyContent.innerHTML = ''; // Kosongkan
@@ -497,7 +493,7 @@
         function updateBarChart(peserta) {
             const labels = peserta.skorItem.map(item => item.label);
             const data = peserta.skorItem.map(item => item.score);
-            const titles = peserta.skorItem.map(item => item.title); // ** BARU: Dapatkan tajuk **
+            const titles = peserta.skorItem.map(item => item.title); // Dapatkan tajuk
 
             // Mewarnakan bar berdasarkan domain
             const backgroundColors = [];
@@ -551,7 +547,7 @@
                             legend: {
                                 display: false 
                             },
-                            // ** DIKEMAS KINI: Tooltip kustom **
+                            // Tooltip kustom
                             tooltip: {
                                 callbacks: {
                                     title: function(tooltipItems) {
@@ -578,7 +574,7 @@
                 barChart.data.datasets[0].data = data;
                 barChart.data.datasets[0].backgroundColor = backgroundColors;
                 barChart.data.datasets[0].borderColor = backgroundColors.map(color => color.replace('0.6', '1'));
-                // ** BARU: Kemas kini data tajuk untuk tooltip **
+                // Kemas kini data tajuk untuk tooltip
                 barChart.options.plugins.tooltip.callbacks.title = function(tooltipItems) {
                     const index = tooltipItems[0].dataIndex;
                     return titles[index] || '';
@@ -588,13 +584,17 @@
         }
 
         // --- MULAKAN APLIKASI ---
-        uploadEl.addEventListener('change', handleFileUpload);
+        
+        // ** BARU: Panggil fungsi 'loadDataFromURL' apabila halaman dimuatkan **
+        // Gantikan 'uploadEl.addEventListener' yang lama
+        loadDataFromURL(DATA_CSV_URL);
+
 
         // Event listener untuk butang toggle
         viewDomainBtn.addEventListener('click', () => {
             radarContainer.style.display = 'block';
             barContainer.style.display = 'none';
-            itemKeyContainer.style.display = 'none'; // ** BARU: Sembunyikan petunjuk **
+            itemKeyContainer.style.display = 'none'; // Sembunyikan petunjuk
             // Kemas kini stail butang
             viewDomainBtn.classList.add('bg-blue-600', 'text-white');
             viewDomainBtn.classList.remove('bg-white', 'text-gray-700');
@@ -605,7 +605,7 @@
         viewItemBtn.addEventListener('click', () => {
             radarContainer.style.display = 'none';
             barContainer.style.display = 'block';
-            itemKeyContainer.style.display = 'block'; // ** BARU: Paparkan petunjuk **
+            itemKeyContainer.style.display = 'block'; // Paparkan petunjuk
             // Kemas kini stail butang
             viewItemBtn.classList.add('bg-blue-600', 'text-white');
             viewItemBtn.classList.remove('bg-white', 'text-gray-700');
