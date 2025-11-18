@@ -98,9 +98,6 @@
     <script>
         // --- KONFIGURASI ---
         
-        // ** DATA_CSV_URL tidak lagi digunakan, ia akan ditentukan secara dinamik **
-        // const DATA_CSV_URL = 'data_propkes_pra.csv'; 
-
         // Indeks kolum berdasarkan fail CSV
         const NAMA_INDEX = 3; // Kolum 'NAMA PESERTA'
         
@@ -161,15 +158,13 @@
         ];
 
         // --- PEMBOLEHUBAH GLOBAL ---
-        let pesertaData = [];
+        // 'pesertaData' tidak lagi global, ia akan diuruskan oleh fungsi
         let radarChart = null;
         let barChart = null; 
         const statusEl = document.getElementById('status');
         const selectEl = document.getElementById('peserta-select');
         const ringkasanEl = document.getElementById('ringkasan');
-        // 'uploadEl' tidak diperlukan lagi
-
-        // Rujukan untuk elemen-elemen baru
+        
         const viewDomainBtn = document.getElementById('view-domain-btn');
         const viewItemBtn = document.getElementById('view-item-btn');
         const radarContainer = document.getElementById('chart-container');
@@ -180,25 +175,63 @@
         // --- FUNGSI ---
 
         /**
-         * ** FUNGSI BARU: Memuatkan data dari URL menggunakan fetch() **
+         * ** FUNGSI DIUBAH SUAI: Memuatkan data peserta DAN purata **
          */
-        async function loadDataFromURL(url) {
-            statusEl.textContent = `Memproses data dari ${url}...`;
+        async function loadAndProcessData(pesertaUrl, purataUrl) {
+            statusEl.textContent = `Memproses data...`;
             statusEl.className = "text-center text-gray-500 mb-4";
             selectEl.disabled = true;
             selectEl.innerHTML = '<option>Memproses data...</option>';
 
             try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`Gagal mendapatkan fail: ${response.status} ${response.statusText}`);
+                // Muat turun kedua-dua fail secara serentak
+                const [pesertaResponse, purataResponse] = await Promise.all([
+                    fetch(pesertaUrl),
+                    fetch(purataUrl)
+                ]);
+
+                // Semak jika fail peserta wujud
+                if (!pesertaResponse.ok) {
+                    throw new Error(`Gagal mendapatkan fail peserta: ${pesertaResponse.status} ${pesertaResponse.statusText}. Pastikan fail ${pesertaUrl} wujud.`);
                 }
-                const csvText = await response.text();
-                // Gunakan semula fungsi processData sedia ada
-                processData(csvText); 
+                
+                // Semak jika fail purata wujud
+                if (!purataResponse.ok) {
+                    throw new Error(`Gagal mendapatkan fail purata: ${purataResponse.status} ${purataResponse.statusText}. Pastikan fail ${purataUrl} wujud.`);
+                }
+
+                // Dapatkan teks dari kedua-dua fail
+                const [pesertaCsvText, purataCsvText] = await Promise.all([
+                    pesertaResponse.text(),
+                    purataResponse.text()
+                ]);
+
+                // Proses kedua-dua set data
+                const pesertaDataArray = parseCsvData(pesertaCsvText);
+                const purataDataArray = parseCsvData(purataCsvText);
+
+                if (pesertaDataArray.length === 0) {
+                    throw new Error("Fail CSV peserta tidak mempunyai data yang sah atau kosong.");
+                }
+                if (purataDataArray.length === 0) {
+                    throw new Error("Fail CSV purata tidak mempunyai data yang sah atau kosong.");
+                }
+
+                // Ambil data baris pertama dari setiap fail
+                const peserta = pesertaDataArray[0]; 
+                const purata = purataDataArray[0]; 
+
+                populateKey(); // Sediakan petunjuk untuk carta bar
+                
+                // Hantar KEDUA-DUA objek data ke fungsi paparan
+                updateDisplays(peserta, purata); 
+                
+                statusEl.textContent = `Laporan Kompetensi i-PROPKES`;
+                statusEl.className = "text-center text-gray-700 mb-4";
+                
             } catch (error) {
                 console.error("Ralat memuatkan data CSV:", error);
-                statusEl.textContent = `Ralat: Gagal mendapatkan data. Pastikan fail ${url} wujud di lokasi yang betul.`;
+                statusEl.textContent = `Ralat: ${error.message}`;
                 statusEl.className = "text-center text-red-600 font-bold mb-4";
                 selectEl.innerHTML = '<option>Gagal mendapatkan data</option>';
             }
@@ -269,21 +302,14 @@
         }
 
         /**
-         * ** FUNGSI 'handleFileUpload' TIDAK DIPERLUKAN LAGI **
+         * ** DIUBAH SUAI: Memproses data CSV dan MENGEMBALIKAN data **
          */
-        // function handleFileUpload(event) { ... }
-
-
-        /**
-         * Memproses data CSV dari teks
-         */
-        function processData(csvText) {
+        function parseCsvData(csvText) {
             try {
-                pesertaData = [];
                 const rows = csvText.split(/\r?\n/).filter(row => row.trim() !== '');
                 
-                // Anggap baris pertama ialah header, dan hanya ada SATU baris data
-                pesertaData = rows.slice(1).map(rowStr => { 
+                // Anggap baris pertama ialah header, ambil semua baris data
+                const processedData = rows.slice(1).map(rowStr => { 
                     const row = parseCSVRow(rowStr);
                     
                     if (!row[NAMA_INDEX] || row[NAMA_INDEX].trim() === '') {
@@ -332,44 +358,17 @@
                     };
                 }).filter(p => p !== null); 
 
-                // --- LOGIK BARU UNTUK FAIL CSV TUNGGAL ---
-
-                if (pesertaData.length === 0) {
+                if (processedData.length === 0) {
                     throw new Error("Fail CSV ini tidak mempunyai data yang sah atau kosong.");
                 }
 
-                // Memandangkan fail ini hanya untuk seorang, kita ambil peserta pertama
-                const peserta = pesertaData[0]; 
-
-                populateKey(); // Sediakan petunjuk untuk carta bar
-                updateDisplays(peserta.nama); // Paparkan data peserta ini
-                
-                // Kemas kini status untuk menunjukkan nama peserta yang dipaparkan
-                statusEl.textContent = `Laporan Kompetensi i-PROPKES`;
-                statusEl.className = "text-center text-gray-700 mb-4";
-                
-                // Tiada lagi carian atau logik dropdown diperlukan
+                return processedData; // Kembalikan data yang telah diproses
                 
             } catch (error) {
                 console.error("Ralat memproses data:", error);
-                statusEl.textContent = `Ralat: ${error.message}`;
-                statusEl.className = "text-center text-red-600 font-bold mb-4";
-                selectEl.innerHTML = '<option>Gagal mendapatkan data</option>';
-                selectEl.disabled = true;
+                // Teruskan lontar ralat untuk ditangkap oleh loadAndProcessData
+                throw error; 
             }
-        }
-
-        /**
-         * Mengisi senarai dropdown dengan nama peserta (TIDAK DIGUNAKAN, TAPI DIBIARKAN)
-         */
-        function populateDropdown() {
-            selectEl.innerHTML = ''; 
-            pesertaData.forEach(peserta => {
-                const option = document.createElement('option');
-                option.value = peserta.nama;
-                option.textContent = peserta.nama;
-                selectEl.appendChild(option);
-            });
         }
 
         /**
@@ -386,20 +385,19 @@
 
 
         /**
-         * Fungsi utama untuk mengemas kini semua paparan
+         * ** DIUBAH SUAI: Fungsi utama untuk mengemas kini semua paparan **
          */
-        function updateDisplays(namaPeserta) {
-            // Kita cari dari 'pesertaData' global, yang sepatutnya hanya ada satu item
-            const peserta = pesertaData.find(p => p.nama === namaPeserta);
-            if (!peserta) return;
+        function updateDisplays(peserta, purata) {
+            // 'peserta' dan 'purata' kini dihantar terus
+            if (!peserta || !purata) return;
 
             // 1. Kemas kini Carta Radar
-            updateRadarChart(peserta);
+            updateRadarChart(peserta, purata);
             
             // 2. Kemas kini Carta Bar
-            updateBarChart(peserta);
+            updateBarChart(peserta, purata);
 
-            // 3. Kemas kini Ringkasan
+            // 3. Kemas kini Ringkasan (hanya guna data peserta)
             ringkasanEl.innerHTML = `
                 <h3 class="text-lg font-semibold">Ringkasan untuk: ${peserta.nama}</h3>
                 <p class="text-xl mt-2">
@@ -414,10 +412,11 @@
         }
 
         /**
-         * Mengemaskini carta radar
+         * ** DIUBAH SUAI: Mengemaskini carta radar dengan 2 set data **
          */
-        function updateRadarChart(peserta) {
-            const data = DOMAIN_LABELS.map(domain => peserta.skorDomain[domain].toFixed(2));
+        function updateRadarChart(peserta, purata) {
+            const dataPeserta = DOMAIN_LABELS.map(domain => peserta.skorDomain[domain].toFixed(2));
+            const dataPurata = DOMAIN_LABELS.map(domain => purata.skorDomain[domain].toFixed(2));
 
             if (!radarChart) {
                 const ctx = document.getElementById('radar-chart').getContext('2d');
@@ -425,15 +424,26 @@
                     type: 'radar',
                     data: {
                         labels: DOMAIN_LABELS.map(l => l.replace('&', '&\n')), 
-                        datasets: [{
-                            label: 'Skor Purata Domain',
-                            data: data,
-                            backgroundColor: 'rgba(30, 64, 175, 0.2)', 
-                            borderColor: 'rgba(30, 64, 175, 1)', 
-                            borderWidth: 2,
-                            pointBackgroundColor: 'rgba(30, 64, 175, 1)',
-                            pointRadius: 4
-                        }]
+                        datasets: [
+                            {
+                                label: 'Skor Anda',
+                                data: dataPeserta,
+                                backgroundColor: 'rgba(30, 64, 175, 0.2)', 
+                                borderColor: 'rgba(30, 64, 175, 1)', 
+                                borderWidth: 2,
+                                pointBackgroundColor: 'rgba(30, 64, 175, 1)',
+                                pointRadius: 4
+                            },
+                            {
+                                label: 'Purata Keseluruhan',
+                                data: dataPurata,
+                                backgroundColor: 'rgba(107, 114, 128, 0.2)', // Kelabu
+                                borderColor: 'rgba(55, 65, 81, 1)',         // Kelabu gelap
+                                borderWidth: 2,
+                                pointBackgroundColor: 'rgba(55, 65, 81, 1)',
+                                pointRadius: 4
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
@@ -485,17 +495,19 @@
                     }
                 });
             } else {
-                radarChart.data.datasets[0].data = data;
+                radarChart.data.datasets[0].data = dataPeserta;
+                radarChart.data.datasets[1].data = dataPurata;
                 radarChart.update();
             }
         }
 
         /**
-         * Fungsi untuk mencipta/mengemas kini Carta Bar
+         * ** DIUBAH SUAI: Fungsi untuk mencipta/mengemas kini Carta Bar dengan garisan purata **
          */
-        function updateBarChart(peserta) {
+        function updateBarChart(peserta, purata) {
             const labels = peserta.skorItem.map(item => item.label);
-            const data = peserta.skorItem.map(item => item.score);
+            const dataPeserta = peserta.skorItem.map(item => item.score);
+            const dataPurata = purata.skorItem.map(item => item.score); // Data purata baru
             const titles = peserta.skorItem.map(item => item.title); // Dapatkan tajuk
 
             // Mewarnakan bar berdasarkan domain
@@ -514,16 +526,30 @@
             if (!barChart) {
                 const ctx = document.getElementById('bar-chart').getContext('2d');
                 barChart = new Chart(ctx, {
-                    type: 'bar',
+                    type: 'bar', // Jenis carta utama ialah bar
                     data: {
                         labels: labels,
-                        datasets: [{
-                            label: 'Skor', // Label ringkas untuk dataset
-                            data: data,
-                            backgroundColor: backgroundColors,
-                            borderColor: backgroundColors.map(color => color.replace('0.6', '1')),
-                            borderWidth: 1
-                        }]
+                        datasets: [
+                            {
+                                type: 'bar', // Set data ini ialah bar
+                                label: 'Skor Anda',
+                                data: dataPeserta,
+                                backgroundColor: backgroundColors,
+                                borderColor: backgroundColors.map(color => color.replace('0.6', '1')),
+                                borderWidth: 1
+                            },
+                            {
+                                type: 'line', // Set data ini ialah garisan
+                                label: 'Purata Keseluruhan',
+                                data: dataPurata,
+                                borderColor: 'rgba(217, 35, 35, 0.8)', // Merah
+                                backgroundColor: 'rgba(217, 35, 35, 0.1)',
+                                borderWidth: 3,
+                                pointRadius: 2,
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
@@ -548,15 +574,14 @@
                         },
                         plugins: {
                             legend: {
-                                display: false 
+                                display: true, // Paparkan legend (Skor Anda vs Purata)
+                                position: 'top'
                             },
                             // Tooltip kustom
                             tooltip: {
                                 callbacks: {
                                     title: function(tooltipItems) {
-                                        // Dapatkan indeks item yang di-hover
                                         const index = tooltipItems[0].dataIndex;
-                                        // Dapatkan tajuk penuh dari array 'titles'
                                         return titles[index] || '';
                                     },
                                     label: function(context) {
@@ -574,9 +599,11 @@
                 });
             } else {
                 barChart.data.labels = labels;
-                barChart.data.datasets[0].data = data;
+                barChart.data.datasets[0].data = dataPeserta;
                 barChart.data.datasets[0].backgroundColor = backgroundColors;
                 barChart.data.datasets[0].borderColor = backgroundColors.map(color => color.replace('0.6', '1'));
+                barChart.data.datasets[1].data = dataPurata; // Kemas kini data garisan purata
+                
                 // Kemas kini data tajuk untuk tooltip
                 barChart.options.plugins.tooltip.callbacks.title = function(tooltipItems) {
                     const index = tooltipItems[0].dataIndex;
@@ -588,20 +615,20 @@
 
         // --- MULAKAN APLIKASI ---
         
-        // ** LOGIK BARU: Dapatkan nama fail dari URL **
-        
         // Dapatkan parameter 'data' dari URL
         const urlParams = new URLSearchParams(window.location.search);
         const dataFileKey = urlParams.get('data'); // cth: 'ali' dari '?data=ali'
 
         if (dataFileKey) {
-            // ** DIKEMAS KINI: Tukar kunci kepada huruf kecil & buang ruang **
             const cleanKey = dataFileKey.trim().toLowerCase();
 
-            // Jika ada kunci fail, bina URL CSV dan muatkannya
-            // cth: 'ali' -> 'ali.csv'
+            // Bina URL untuk kedua-dua fail
             const dynamicCsvUrl = cleanKey + '.csv'; 
-            loadDataFromURL(dynamicCsvUrl);
+            const purataCsvUrl = 'purata.csv'; // Fail purata yang baru
+
+            // Panggil fungsi pemuat baru
+            loadAndProcessData(dynamicCsvUrl, purataCsvUrl);
+
         } else {
             // Tiada kunci fail di URL, paparkan ralat
             statusEl.textContent = "Pautan tidak lengkap.";
